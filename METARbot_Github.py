@@ -1,5 +1,6 @@
-import requests, bs4, re, ast, datetime, time, caffeine
-from smtplib import SMTP
+import requests, bs4, re, json, datetime, time, platform
+if platform.system() == "Darwin":
+    import caffeine
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
@@ -58,14 +59,13 @@ while True:
         break
     else:
         if currentTime.hour<11 or currentTime.hour>12:
-            print("Running 'caffeine' to prevent the system from sleeping.")
-            caffeine.on(display=False)
+            if platform.system() == "Darwin":
+                print("Running 'caffeine' to prevent the system from sleeping.")
+                caffeine.on(display=False)
             time.sleep(3600)
         else:
-            print("Running 'caffeine' to prevent the system from sleeping.")
-            caffeine.on(display=False)
+            if platform.system() == "Darwin":
+                print("Running 'caffeine' to prevent the system from sleeping.")
+                caffeine.on(display=False)
             time.sleep(60)
         continue
-        
-
-
