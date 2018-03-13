@@ -1,71 +1,136 @@
-import requests, bs4, re, json, datetime, time, platform
+# Imports required modules
+import requests, bs4, re, json, datetime, time, platform, smtplib
+# Checks to see if platform is Darwin-based since caffeine is Mac-only
 if platform.system() == "Darwin":
     import caffeine
+from smtplib import SMTP
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+
+# Asks the user to input the password and sets a "password" variable equal to the input
 
 print ("Please enter the password for AWC.METAR.bot@gmail.com.")
 password = input()
 
-while True:
-    currentTime = datetime.datetime.now()
-    print(str(currentTime.hour) + ":" + str(currentTime.minute))
-    if currentTime.hour == 12 and currentTime.minute == 0:
-        emailFile = open("./emailList_example.txt")
-        emailContent = emailFile.read()
-        emailContent = ast.literal_eval(emailContent)
-        airportList = list(emailContent.values())
-        emailList = list(emailContent.keys())
-        for a in range(len(airportList)):
-                airportList[a] = ", ".join(airportList[a])
+# Input desired time for email here
+# Time zone should be time zone of system on which this code is being run
+sendHr = 12
+sendMin = 0
 
+# Creates while loop
+while True:
+    # Creates variable "currentTime" equal to current time
+    currentTime = datetime.datetime.now()
+    # Prints time for reference
+    print(str(currentTime.hour) + ":" + str(currentTime.minute))
+    # If statement so code only runs at correct time
+    if currentTime.hour == sendHr and currentTime.minute == sendMin:
+        # Creates variable "emailFile" from contents of emailList_example.txt
+        emailFile = open("./emailList_example.txt")
+        # Creates variable "emailContent" containing properly formatted dictionary
+        emailContent = json.loads(emailFile.read())
+        # Creates list "emailList" from the keys of emailContent
+        emailList = list(emailContent.keys())
+        # Creates list "airportList" from the values of emailContent
+        airportList = list(emailContent.values())
+        # Creates for loop that runs for every list of airports
+        for a in range(len(airportList)):
+            # Turns "airportList" into string that works with AviationWeather.gov's URL formatting
+            airportList[a] = "+".join(airportList[a])
+
+        # Makes contact with smtp.gmail.com on SSL port 587
         smtpObj = SMTP("smtp.gmail.com", 587)
         smtpObj.ehlo()
+        # Starts TLS encryption
         smtpObj.starttls()
+        # Creates variable "botEmail" containing bot's email address
         botEmail = "AWC.METAR.bot@gmail.com"
-        smtpObj.login(botEmail,password)
+        # Creates while loop
+        while True:
+            # Try part of try/except statement
+            try:
+                # Attempts to log in to bot's email account
+                smtpObj.login(botEmail,password)
+            # Except statement for when an error is thrown
+            except:
+                print ("Password incorrect. Try again.")
+                # Sets "password" equal to input
+                password = input()
+                # Restarts this while loop to allow multiple login attempts
+                continue
+            # Breaks out of this while loop
+            break
 
+        # Creates for loop that runs for every item in emailContent
         for i in range(len(emailContent)):
+            # Creates variable "airport" equal to ith string in airportList
             airport = airportList[i]
 
+            # Sets variable "res" equal to return of AWC link
             res = requests.get("https://aviationweather.gov/metar/data?ids=" +
                            airport + "&format=raw&date=0&hours=0&taf=on")
 
+            # Creates regex to sort for useful data
             wxRegex = re.compile (r"<!-- Data starts here -->(.*)<!-- Data ends here -->", re.DOTALL)
+            # Used in previous version
             avWX = bs4.BeautifulSoup(res.text, "html.parser")
+            # Narrows down "res" into more useful HTML text
             awcMC = avWX.select ("#awc_main_content")
 
+            # Searches "awcMC" for text matching text described by "wxRegex"
             avMETAR = wxRegex.search(str(awcMC))
+            # Changes "avMETAR" from regex object to string
             avMETAR = avMETAR.group()
+            # Substitutes <br/> (html linebreak) for \n (Python linebreak)
             avMETAR = re.sub(r"<br/>", "\n", avMETAR)
+            # Gets rid of html tags
             avMETAR = bs4.BeautifulSoup(avMETAR, "html.parser")
+            # Changes "avMETAR from BeautifulSoup object to string
             avMETAR = avMETAR.text
 
+            # Prints avMETAR - plan to update this so it writes to a log file
             print (avMETAR)
 
+            # Sets variable "toAdress" equal to ith email
             toAddress = emailList[i]
+            # Creates MIMEMultipart-type variable "msg"
             msg = MIMEMultipart()
+            # Sets sender to "botEmail"
             msg['From'] = botEmail
+            # Sets recipient to "toAddress"
             msg['To'] = toAddress
+            # Prints recipient's email
             print("Sent to: " + msg['To'])
+            # Sets email subject
             msg['Subject'] = "Your Daily Weather"
+            # Sets email body to "avMETAR"
             body = avMETAR
+            # Unsure of exactly what this does
             msg.attach(MIMEText(body,"plain"))
+            # Sends email from "botEmail" to "toAddress" with "msg" formatted as string
             smtpObj.sendmail(botEmail,toAddress,msg.as_string())
 
 
-
+        # Closes SMTP connection
         smtpObj.close()
+        # Breaks while loop
         break
+    # Else statement for when time does not match desired send time
     else:
-        if currentTime.hour<11 or currentTime.hour>12:
+        # Checks "currentTime" to see if it's safe to set the amount of time to sleep to 1 hour
+        if currentTime.hour<(sendHr-1) or currentTime.hour>sendHr:
+            # Checks that platform is Darwin-based since caffeine is a Mac command
             if platform.system() == "Darwin":
                 print("Running 'caffeine' to prevent the system from sleeping.")
+                # Keeps computer awake but allows display to sleep
                 caffeine.on(display=False)
             time.sleep(3600)
+        # Program sleeps only for 1 minute per loop if time before "currentTime" ≤1hr
         else:
             if platform.system() == "Darwin":
                 print("Running 'caffeine' to prevent the system from sleeping.")
+                # Keeps computer awake but allows display to sleep
                 caffeine.on(display=False)
             time.sleep(60)
+        # Restarts while loop
         continue
