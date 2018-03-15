@@ -1,5 +1,5 @@
 # Imports required modules
-import requests, bs4, re, json, datetime, time, platform, smtplib
+import requests, bs4, re, json, datetime, time, platform, logging
 # Checks to see if platform is Darwin-based since caffeine is Mac-only
 if platform.system() == "Darwin":
     import caffeine
@@ -7,22 +7,30 @@ from smtplib import SMTP
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
-# Asks the user to input the password and sets a "password" variable equal to the input
 
+# Asks the user to input the password and sets a "password" variable equal to the input
 print ("Please enter the password for AWC.METAR.bot@gmail.com.")
 password = input()
 
-# Input desired time for email here
-# Time zone should be time zone of system on which this code is being run
-sendHr = 12
-sendMin = 0
+# setupFile = "./METARbot_setup_Github.py".read()
+from METARbot_setup_Github import sendHr, sendMin
+
+# Creates variables "caffeineHr" and "caffeineMin" to store usage data
+caffeineHr = 0
+caffeineMin = 0
 
 # Creates while loop
 while True:
     # Creates variable "currentTime" equal to current time
     currentTime = datetime.datetime.now()
+    # Configures logging
+    logging.basicConfig(filename = "./BotLogs/" + str(currentTime.day) + "." +
+    str(currentTime.month) + "." + str(currentTime.year) + "BotLog.txt",
+    level = logging.DEBUG, format = "%(asctime)s - %(levelname)s - %(message)s")
     # Prints time for reference
     print(str(currentTime.hour) + ":" + str(currentTime.minute))
+    # Logs time
+    logging.debug("%(asctime)s")
     # If statement so code only runs at correct time
     if currentTime.hour == sendHr and currentTime.minute == sendMin:
         # Creates variable "emailFile" from contents of emailList_example.txt
@@ -87,9 +95,12 @@ while True:
             avMETAR = bs4.BeautifulSoup(avMETAR, "html.parser")
             # Changes "avMETAR from BeautifulSoup object to string
             avMETAR = avMETAR.text
+            # UTF-8 stuff I don't completely understand
+            avMETAR = re.sub("\xa0", " ", avMETAR)
 
-            # Prints avMETAR - plan to update this so it writes to a log file
+            # Prints and logs avMETAR
             print (avMETAR)
+            logging.debug(avMETAR)
 
             # Sets variable "toAdress" equal to ith email
             toAddress = emailList[i]
@@ -101,6 +112,8 @@ while True:
             msg['To'] = toAddress
             # Prints recipient's email
             print("Sent to: " + msg['To'])
+            # Logs recipient's email
+            logging.debug("Sent to: " + msg["To"])
             # Sets email subject
             msg['Subject'] = "Your Daily Weather"
             # Sets email body to "avMETAR"
@@ -122,6 +135,9 @@ while True:
             # Checks that platform is Darwin-based since caffeine is a Mac command
             if platform.system() == "Darwin":
                 print("Running 'caffeine' to prevent the system from sleeping.")
+                # Adds 1 to "caffeineMin" every time caffeine runs before time.sleep(3600)
+                caffeineHr += 1
+                logging.debug("Caffeine has run " + str(caffeineHr) + " times.")
                 # Keeps computer awake but allows display to sleep
                 caffeine.on(display=False)
             time.sleep(3600)
@@ -129,6 +145,9 @@ while True:
         else:
             if platform.system() == "Darwin":
                 print("Running 'caffeine' to prevent the system from sleeping.")
+                # Adds 1 to "caffeineMin" every time caffeine runs before time.sleep(60)
+                caffeineMin += 1
+                logging.debug("Caffeine has run " + str(caffeineMin) + " times.")
                 # Keeps computer awake but allows display to sleep
                 caffeine.on(display=False)
             time.sleep(60)
